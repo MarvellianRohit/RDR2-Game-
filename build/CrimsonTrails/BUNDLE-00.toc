@@ -1,0 +1,3 @@
+([('CrimsonTrails',
+   '/Users/rohitchandra/Documents/RDR2/dist/CrimsonTrails',
+   'EXECUTABLE')],)

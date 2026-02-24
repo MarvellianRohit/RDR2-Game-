@@ -1,0 +1,43 @@
+[
+    {
+        "timestamp": 0.5,
+        "action": "CAMERA_PAN",
+        "data": {
+            "target_pos": [
+                100,
+                100
+            ],
+            "duration": 2.0
+        }
+    },
+    {
+        "timestamp": 1.5,
+        "actor_id": "sheriff",
+        "action": "ACTOR_WALK",
+        "data": {
+            "target_tile": [
+                10,
+                10
+            ]
+        }
+    },
+    {
+        "timestamp": 3.0,
+        "actor_id": "sheriff",
+        "action": "ACTOR_SAY",
+        "data": {
+            "text": "Who's there? Show yourself!"
+        }
+    },
+    {
+        "timestamp": 5.0,
+        "action": "CAMERA_PAN",
+        "data": {
+            "target_pos": [
+                0,
+                0
+            ],
+            "duration": 1.0
+        }
+    }
+]
