@@ -52,8 +52,12 @@ Entity._fields_ = [
     ("x", ctypes.c_float),
     ("y", ctypes.c_float),
     ("sprite_type", ctypes.c_int),
+    ("hitbox_width", ctypes.c_float),
+    ("hitbox_height", ctypes.c_float),
+    ("hitbox_offset_x", ctypes.c_float),
+    ("hitbox_offset_y", ctypes.c_float),
     ("active", ctypes.c_int),
-    ("prev", ctypes.c_void_p), # Using void_p for simplicity in bridge
+    ("prev", ctypes.c_void_p),
     ("next", ctypes.c_void_p)
 ]
 
@@ -62,6 +66,7 @@ class QuadNode(ctypes.Structure):
 
 # --- Asset Mapping ---
 SPRITE_MAP = {
+    0: "outlaw_idle", # Player
     1: "bullet",
     2: "enemy"
 }
@@ -87,6 +92,8 @@ def load_engine():
         engine.find_path.restype = ctypes.c_int
         engine.check_collision_aabb.argtypes = [AABB, AABB]
         engine.check_collision_aabb.restype = ctypes.c_int
+        engine.check_entity_collision.argtypes = [ctypes.c_float] * 12
+        engine.check_entity_collision.restype = ctypes.c_int
         engine.create_node.argtypes = [AABB]
         engine.create_node.restype = ctypes.POINTER(QuadNode)
         engine.qt_insert.argtypes = [ctypes.POINTER(QuadNode), ctypes.c_int, ctypes.c_float, ctypes.c_float]
@@ -119,7 +126,7 @@ COLOR_GRID = (40, 40, 50)
 COLOR_TILE = (30, 30, 40)
 COLOR_NPC = (200, 50, 50)
 COLOR_SHERIFF = (50, 50, 200)
-AMBIENT_LIGHT = (20, 20, 30, 220)
+AMBIENT_LIGHT = (20, 20, 30, 110) # Brighter darkness for better grid visibility
 
 # --- Lighting Helper ---
 class LightSource:
@@ -127,8 +134,10 @@ class LightSource:
         self.pos = (x, y)
         self.radius = radius
         self.mask = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-        for r in range(radius, 0, -1):
-            alpha = int(255 * (1 - (r / radius) ** 0.8))
+        # Optimized gradient drawing with very soft falloff
+        for r in range(radius, 0, -2):
+            # Using a cubic power falloff for a much smoother edge transition
+            alpha = int(255 * (1 - (r / radius)) ** 4)
             pygame.draw.circle(self.mask, (*color, alpha), (radius, radius), r)
 
     def draw(self, darkness_surface, camera=None):
@@ -156,13 +165,28 @@ class PlayingState(GameState):
         self.darkness = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         campfire_pos = cartesian_to_iso(5, 5)
         self.campfire = LightSource(campfire_pos[0], campfire_pos[1], 400, (255, 150, 50))
+        # Player-attached light source: significantly larger radius and warm color
+        self.player_light = LightSource(0, 0, 1600, (255, 220, 150))
         self.grid = (ctypes.c_int * (GRID_SIZE * GRID_SIZE))(*([0] * (GRID_SIZE * GRID_SIZE)))
         
         self.health = 100
-        self.player = Player([2.0, 2.0], speed=4.0)
+        self.player = Player([2.0, 2.0], speed=6.0)
         
-        # NPC Setup
-        self.npc_pos, self.npc_active, self.npc_path, self.move_timer = [5.0, 5.0], True, [], 0
+        # --- C-Engine Player Entity Setup ---
+        if self.engine:
+            # Outlaw sprite: 64x128. Hitbox: 32x16 at feet (bottom-center).
+            # Offset is relative to the sprite center. 
+            # Sprite center is (32, 64). Feet are at (32, 128).
+            # So offset_y = 64 (down from center).
+            self.player_entity = self.engine.add_entity(2.0, 2.0, 0) # type 0 for player
+            if self.player_entity:
+                self.player_entity.contents.hitbox_width = 32.0
+                self.player_entity.contents.hitbox_height = 16.0
+                self.player_entity.contents.hitbox_offset_x = 0.0
+                self.player_entity.contents.hitbox_offset_y = -8.0 # Precisely at feet
+        
+        # NPC Setup (Disabled to resolve duplicate sprite issue)
+        self.npc_pos, self.npc_active, self.npc_path, self.move_timer = [5.0, 5.0], False, [], 0
         self.npc_anim = Animator()
         
         # Load NPC sprite for animation
@@ -176,7 +200,6 @@ class PlayingState(GameState):
         self.drawn_count = 0
         self.culled_count = 0
         self.telemetry_frame_count = 0
-        self.player = Player([2.0, 2.0], speed=6.0)
         self.weapons = WeaponWheel()
         self.weapons.add_weapon("Cattleman Revolver", 30, 6, 0.4)
         self.weapons.add_weapon("Lancaster Repeater", 45, 14, 0.6)
@@ -212,12 +235,15 @@ class PlayingState(GameState):
                 color = (50, 100, 255) if i % 2 == 0 else (70, 120, 255)
                 pygame.draw.rect(player_sheet, color, (i*32, 0, 32, 32))
                 pygame.draw.rect(player_sheet, (255, 255, 255), (i*32, 0, 32, 32), 1)
+            player_sheet = player_sheet.convert_alpha()
         
         self.player_anim.add_animation("idle", Animation(player_sheet, 32, 32, 1, frame_duration=1.0))
         self.player_anim.add_animation("walk", Animation(player_sheet, 32, 32, 4, frame_duration=0.15))
         
-        self.npc_anim.add_animation("idle", Animation(player_sheet, 32, 32, 1, frame_duration=1.0))
-        self.npc_anim.add_animation("walk", Animation(player_sheet, 32, 32, 4, frame_duration=0.15))
+        # NPC animations are already initialized from outlaw_idle above (lines 190-197)
+        # Avoid overwriting with 32x32 placeholders
+        # self.npc_anim.add_animation("idle", Animation(player_sheet, 32, 32, 1, frame_duration=1.0))
+        # self.npc_anim.add_animation("walk", Animation(player_sheet, 32, 32, 4, frame_duration=0.15))
         
         self.last_qt_root = None # Placeholder if needed
         
@@ -306,6 +332,14 @@ class PlayingState(GameState):
         self.logic.update(dt)
         self.clock.update(dt)
         self.player.update(dt)
+        if self.engine and self.player_entity:
+            self.player_entity.contents.x = self.player.pos[0]
+            self.player_entity.contents.y = self.player.pos[1]
+            
+        # Update player light position to anchored feet (ISO coordinates)
+        px_iso, py_iso = cartesian_to_iso(self.player.pos[0], self.player.pos[1])
+        self.player_light.pos = (px_iso, py_iso)
+            
         self.npc_anim.update(dt)
         self.director_timer += 1
         
@@ -391,10 +425,25 @@ class PlayingState(GameState):
         px, py = self.player.pos
         p_iso_x, p_iso_y = cartesian_to_iso(px, py)
         if self.camera.is_visible(p_iso_x, p_iso_y, 64, 64):
+            def draw_player(s, c):
+                # Explicitly calculate draw coordinates to anchor by feet
+                from src.utils import cartesian_to_iso
+                iso_x, iso_y = cartesian_to_iso(self.player.pos[0], self.player.pos[1])
+                screen_x, screen_y = c.apply(iso_x, iso_y)
+                
+                sheet, rect = self.player.animator.get_current_frame_data()
+                if sheet:
+                    # Feet Anchoring: X = screen_x - (w/2), Y = screen_y - h
+                    draw_x = screen_x - (rect.width // 2)
+                    draw_y = screen_y - rect.height
+                    s.blit(sheet, (draw_x, draw_y), area=rect)
+                else:
+                    pygame.draw.circle(s, (0, 255, 0), (int(screen_x), int(screen_y)), 18)
+
             entities.append({
                 'y': py,
                 'type': 'player',
-                'draw': lambda s, c: self.player.draw(s, c)
+                'draw': draw_player
             })
             self.drawn_count += 1
         else:
@@ -406,12 +455,16 @@ class PlayingState(GameState):
             n_iso_x, n_iso_y = cartesian_to_iso(nx, ny)
             if self.camera.is_visible(n_iso_x, n_iso_y, 64, 64):
                 def draw_npc(s, c):
-                    cnx, cny = c.apply(*cartesian_to_iso(self.npc_pos[0], self.npc_pos[1]))
+                    iso_x, iso_y = cartesian_to_iso(self.npc_pos[0], self.npc_pos[1])
+                    screen_x, screen_y = c.apply(iso_x, iso_y)
                     sheet, rect = self.npc_anim.get_current_frame_data()
                     if sheet:
-                        s.blit(sheet, (cnx - rect.width//2, cny - rect.height), area=rect)
+                        # Anchor by feet: center horizontally, bottom at position
+                        draw_x = screen_x - (rect.width // 2)
+                        draw_y = screen_y - rect.height
+                        s.blit(sheet, (draw_x, draw_y), area=rect)
                     else:
-                        pygame.draw.circle(s, (255, 100, 100), (int(cnx), int(cny)), 15)
+                        pygame.draw.circle(s, (255, 100, 100), (int(screen_x), int(screen_y)), 15)
                 
                 entities.append({
                     'y': self.npc_pos[1],
@@ -422,27 +475,31 @@ class PlayingState(GameState):
             else:
                 self.culled_count += 1
             
-        # Static Sheriff
-        sheriff_pos = [2.0, 2.0]
-        s_iso_x, s_iso_y = cartesian_to_iso(sheriff_pos[0], sheriff_pos[1])
-        if self.camera.is_visible(s_iso_x, s_iso_y, 64, 64):
-            def draw_sheriff(s, c):
-                shx, shy = c.apply(*cartesian_to_iso(sheriff_pos[0], sheriff_pos[1]))
-                # Try to get sheriff sprite or fallback
-                sprite = AssetManager().get_sprite("outlaw_idle")
-                if sprite:
-                    s.blit(sprite, (shx - sprite.get_width()//2, shy - sprite.get_height()))
-                else:
-                    pygame.draw.circle(s, COLOR_SHERIFF, (int(shx), int(shy)), 18)
-                    
-            entities.append({
-                'y': sheriff_pos[1],
-                'type': 'sheriff',
-                'draw': draw_sheriff
-            })
-            self.drawn_count += 1
-        else:
-            self.culled_count += 1
+        # Static Sheriff removed as requested (it was a duplicate)
+        # sheriff_pos = [2.0, 2.0]
+        # s_iso_x, s_iso_y = cartesian_to_iso(sheriff_pos[0], sheriff_pos[1])
+        # if self.camera.is_visible(s_iso_x, s_iso_y, 64, 64):
+        #     def draw_sheriff(s, c):
+        #         iso_x, iso_y = cartesian_to_iso(sheriff_pos[0], sheriff_pos[1])
+        #         screen_x, screen_y = c.apply(iso_x, iso_y)
+        #         # Try to get sheriff sprite or fallback
+        #         sprite = AssetManager().get_sprite("outlaw_idle")
+        #         if sprite:
+        #             # Anchor by feet: center horizontally, bottom at position
+        #             draw_x = screen_x - (sprite.get_width() // 2)
+        #             draw_y = screen_y - sprite.get_height()
+        #             s.blit(sprite, (draw_x, draw_y))
+        #         else:
+        #             pygame.draw.circle(s, COLOR_SHERIFF, (int(screen_x), int(screen_y)), 18)
+        #             
+        #     entities.append({
+        #         'y': sheriff_pos[1],
+        #         'type': 'sheriff',
+        #         'draw': draw_sheriff
+        #     })
+        #     self.drawn_count += 1
+        # else:
+        #     self.culled_count += 1
         
         # C-Engine Entities (Bullets etc.)
         if self.engine:
@@ -450,6 +507,11 @@ class PlayingState(GameState):
             while current:
                 if current.contents.active:
                     ent = current.contents
+                    # Skip drawing the player dot (the Python Player class handles its own rendering)
+                    if self.player_entity and ent.id == self.player_entity.contents.id:
+                        current = current.contents.next
+                        continue
+                        
                     # Culling check for C-entities
                     e_iso_x, e_iso_y = cartesian_to_iso(ent.x, ent.y)
                     if self.camera.is_visible(e_iso_x, e_iso_y, 32, 32):
@@ -504,6 +566,7 @@ class PlayingState(GameState):
         # 5. Apply Ambient Lighting Overlay
         self.darkness.fill(AMBIENT_LIGHT)
         self.campfire.draw(self.darkness, camera=self.camera)
+        self.player_light.draw(self.darkness, camera=self.camera)
         screen.blit(self.darkness, (0, 0))
         
         # --- HUD Render (Last Layer) ---

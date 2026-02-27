@@ -12,6 +12,10 @@ typedef struct Entity {
   float x;
   float y;
   int sprite_type; // 0=None, 1=Bullet, 2=Enemy, etc.
+  float hitbox_width;
+  float hitbox_height;
+  float hitbox_offset_x;
+  float hitbox_offset_y;
   int active;
   struct Entity *prev;
   struct Entity *next;
@@ -30,6 +34,10 @@ Entity *add_entity(float x, float y, int sprite_type) {
   new_entity->x = x;
   new_entity->y = y;
   new_entity->sprite_type = sprite_type;
+  new_entity->hitbox_width = 32.0f;  // Default
+  new_entity->hitbox_height = 32.0f; // Default
+  new_entity->hitbox_offset_x = 0.0f;
+  new_entity->hitbox_offset_y = 0.0f;
   new_entity->active = 1;
   new_entity->prev = NULL;
   new_entity->next = head;

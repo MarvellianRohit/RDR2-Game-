@@ -23,12 +23,17 @@ class Player:
             for i in range(4):
                 pygame.draw.rect(surface, (50, 150, 50), (i*32, 0, 32, 32))
                 pygame.draw.rect(surface, (255, 255, 255), (i*32, 0, 32, 32), 1)
+            surface = surface.convert_alpha()
 
+        # Use actual dimensions for the animation frame
+        w, h = surface.get_width(), surface.get_height()
+        
         # In this placeholder logic, we use the same sheet for all states
         # but vary the frame count to simulate different types of anims
+        # If the sheet is narrow, assume it's a single frame (like outlaw_idle)
         for d in ["N", "S", "E", "W"]:
-            self.animator.add_animation(f"IDLE_{d}", Animation(surface, 32, 32, 1, frame_duration=1.0))
-            self.animator.add_animation(f"WALK_{d}", Animation(surface, 32, 32, 4 if surface.get_width() >= 128 else 1, frame_duration=0.15))
+            self.animator.add_animation(f"IDLE_{d}", Animation(surface, w, h, 1, frame_duration=1.0))
+            self.animator.add_animation(f"WALK_{d}", Animation(surface, w, h, 1, frame_duration=0.15))
         
         self.animator.play("IDLE_S")
 
@@ -66,6 +71,9 @@ class Player:
         
         sheet, rect = self.animator.get_current_frame_data()
         if sheet:
-            screen.blit(sheet, (screen_x - rect.width//2, screen_y - rect.height), area=rect)
+            # Anchor by feet: center horizontally, bottom at position
+            draw_x = screen_x - (rect.width // 2)
+            draw_y = screen_y - rect.height
+            screen.blit(sheet, (draw_x, draw_y), area=rect)
         else:
             pygame.draw.circle(screen, (0, 255, 0), (int(screen_x), int(screen_y)), 18)

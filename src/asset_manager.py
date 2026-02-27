@@ -52,9 +52,9 @@ class AssetManager:
                 print(f"[Assets] Warning: Sprite file {path} not found.")
                 return False
                 
-            sprite = pygame.image.load(path)
+            sprite = pygame.image.load(path).convert_alpha()
             
-            # Apply scaling before convert_alpha to save VRAM and CPU
+            # Apply scaling
             if target_scale:
                 w, h = sprite.get_size()
                 if isinstance(target_scale, (int, float)):
@@ -62,11 +62,12 @@ class AssetManager:
                 else:
                     new_size = target_scale
                 
-                # Use smoothscale for high-quality downsampling of large assets
-                sprite = pygame.transform.smoothscale(sprite, new_size)
+                # Use smoothscale and re-convert to ensure alpha is optimized for the display
+                sprite = pygame.transform.smoothscale(sprite, new_size).convert_alpha()
             
-            # Final conversion to display format
-            sprite = sprite.convert_alpha()
+            # Logging for transparency verification
+            has_alpha = sprite.get_flags() & pygame.SRCALPHA
+            print(f"[Assets] Loaded {name} (Alpha: {'YES' if has_alpha else 'NO'}) from {path}")
             
             self._sprites[name] = sprite
             self._total_bytes += sprite.get_width() * sprite.get_height() * 4
