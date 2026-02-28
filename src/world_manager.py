@@ -7,8 +7,23 @@ class WorldManager:
         self.current_chunk = (0, 0)
         self.active_chunks = set()
         self.tiles = {} # {(x, y): type_id}
+        self.solid_tiles = {3, 4} # 3: Cactus, 4: Wall
         self.load_map("assets/maps/world.json")
         print(f"[World] World Manager initialized. Chunk Size: {chunk_size}x{chunk_size}")
+
+    def is_solid(self, x, y):
+        """Checks if a specific grid coordinate is solid/blocked."""
+        tile_type = self.get_tile(x, y)
+        return tile_type in self.solid_tiles
+
+    def get_world_bounds(self):
+        """Returns the (min_x, min_y, max_x, max_y) of the tiled world."""
+        if not self.tiles:
+            return (0, 0, 10, 10) # Fallback to default grid size if empty
+        
+        xs = [k[0] for k in self.tiles.keys()]
+        ys = [k[1] for k in self.tiles.keys()]
+        return (min(xs), min(ys), max(xs) + 1, max(ys) + 1)
 
     def set_tile(self, x, y, type_id):
         """Sets a tile type at a specific coordinate."""

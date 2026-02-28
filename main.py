@@ -331,7 +331,7 @@ class PlayingState(GameState):
     def update(self, dt):
         self.logic.update(dt)
         self.clock.update(dt)
-        self.player.update(dt)
+        self.player.update(dt, self.world)
         if self.engine and self.player_entity:
             self.player_entity.contents.x = self.player.pos[0]
             self.player_entity.contents.y = self.player.pos[1]

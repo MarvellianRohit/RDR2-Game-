@@ -48,8 +48,8 @@ class Player:
         
         self.animator.play("IDLE_S")
 
-    def update(self, dt):
-        """Processes input and updates movement/animations."""
+    def update(self, dt, world_manager=None):
+        """Processes input and updates movement/animations with collision detection."""
         input_mgr = InputManager()
         move_vec = [0.0, 0.0]
         
@@ -62,11 +62,50 @@ class Player:
         if moving:
             # Normalize movement vector for consistent diagonal speed
             length = (move_vec[0]**2 + move_vec[1]**2)**0.5
-            move_vec[0] = (move_vec[0] / length) * self.speed * dt
-            move_vec[1] = (move_vec[1] / length) * self.speed * dt
+            dx = (move_vec[0] / length) * self.speed * dt
+            dy = (move_vec[1] / length) * self.speed * dt
             
-            self.pos[0] += move_vec[0]
-            self.pos[1] += move_vec[1]
+            # --- Collision Detection ---
+            # Hitbox: centered horizontally, small depth (bottom of sprite)
+            # We use world units (1.0 = 1 tile size)
+            hitbox_w = 0.4
+            hitbox_h = 0.2
+            
+            # X Movement
+            new_x = self.pos[0] + dx
+            can_move_x = True
+            if world_manager:
+                # Boundary check
+                min_x, min_y, max_x, max_y = world_manager.get_world_bounds()
+                if new_x - hitbox_w/2 < min_x or new_x + hitbox_w/2 > max_x:
+                    can_move_x = False
+                
+                # Solid tile check
+                # Check target tile and corners of hitbox
+                for check_y in [self.pos[1] - hitbox_h/2, self.pos[1] + hitbox_h/2]:
+                    if world_manager.is_solid(new_x + (hitbox_w/2 if dx > 0 else -hitbox_w/2), check_y):
+                        can_move_x = False; break
+            
+            if not can_move_x: print(f"[Collision] Blocked X at {new_x:.2f}")
+            if can_move_x: self.pos[0] = new_x
+
+            # Y Movement
+            new_y = self.pos[1] + dy
+            can_move_y = True
+            if world_manager:
+                # Boundary check
+                min_x, min_y, max_x, max_y = world_manager.get_world_bounds()
+                if new_y - hitbox_h/2 < min_y or new_y + hitbox_h/2 > max_y:
+                    can_move_y = False
+                
+                # Solid tile check
+                for check_x in [self.pos[0] - hitbox_w/2, self.pos[0] + hitbox_w/2]:
+                    if world_manager.is_solid(check_x, new_y + (hitbox_h/2 if dy > 0 else -hitbox_h/2)):
+                        can_move_y = False; break
+
+            if not can_move_y: print(f"[Collision] Blocked Y at {new_y:.2f}")
+            if can_move_y: self.pos[1] = new_y
+            
             self.animator.play(f"WALK_{self.direction}")
         else:
             self.animator.play(f"IDLE_{self.direction}")
