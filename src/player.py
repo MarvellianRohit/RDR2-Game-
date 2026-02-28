@@ -153,6 +153,7 @@ class Player:
         if bullet:
             bullet.contents.vx = math.cos(angle) * speed_multiplier
             bullet.contents.vy = math.sin(angle) * speed_multiplier
+            camera.add_trauma(0.5)
             print(f"[Shoot] Projectile spawned toward ({mx}, {my}) at {speed_multiplier}u/s")
 
     def draw(self, screen, camera):

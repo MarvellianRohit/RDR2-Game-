@@ -8,6 +8,10 @@ class Camera:
         self.lerp_speed = 0.1
         self.manual_offset = None # (x, y) override for cutscenes
         
+        # Camera Shake (Game Feel)
+        self.trauma = 0.0
+        self.shake_decay = 0.8
+        
         self.screen_width = screen_width
         self.screen_height = screen_height
         
@@ -22,8 +26,14 @@ class Camera:
         self.min_y = (screen_height // 4)
         self.max_y = (screen_height // 4) + (grid_size * tile_height)
 
-    def update(self, target_screen_x, target_screen_y):
-        """Glides the camera toward the target screen position."""
+    def add_trauma(self, amount):
+        """Increases camera trauma, clamped to [0.0, 1.0]."""
+        self.trauma = min(1.0, self.trauma + amount)
+
+    def update(self, target_screen_x, target_screen_y, dt=0.016):
+        """Glides the camera toward the target screen position with optional shake."""
+        import random
+        
         # The goal is to center the target on the screen
         # Desired offset is (target_pos - screen_center)
         desired_offset_x = target_screen_x - self.screen_width // 2
@@ -36,6 +46,18 @@ class Camera:
         else:
             self.offset_x += (desired_offset_x - self.offset_x) * self.lerp_speed
             self.offset_y += (desired_offset_y - self.offset_y) * self.lerp_speed
+            
+        # --- Camera Shake Logic ---
+        if self.trauma > 0:
+            shake_amount = self.trauma * self.trauma
+            offset_shake_x = (random.random() * 10 - 5) * shake_amount
+            offset_shake_y = (random.random() * 10 - 5) * shake_amount
+            
+            self.offset_x += offset_shake_x
+            self.offset_y += offset_shake_y
+            
+            # Decay trauma over time
+            self.trauma = max(0.0, self.trauma - self.shake_decay * dt)
         
         # Clamping logic to keep the camera within the world bounds
         # Note: This is a simplified clamping and might need adjustment for isometric scale

@@ -36,6 +36,8 @@ class Minimap:
 
         # Draw C Entities (Bullets, etc.)
         if entities_head:
+            from ctypes import cast, POINTER
+            from src.utils import Entity
             curr = entities_head
             while curr:
                 if curr.contents.active:
@@ -44,7 +46,10 @@ class Minimap:
                     my = self.center + (ey - py) * self.scale
                     if 0 < mx < self.size and 0 < my < self.size:
                         pygame.draw.circle(self.surface, (255, 255, 100), (int(mx), int(my)), 2)
+                        
                 curr = curr.contents.next
+                if curr: curr = cast(curr, POINTER(Entity))
+
 
         # Blit to top-right of screen
         screen_w = screen.get_width()

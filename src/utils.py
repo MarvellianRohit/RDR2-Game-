@@ -1,8 +1,29 @@
+import ctypes
 # Constants (should ideally be imported from a config, but keeping here for simplicity)
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 TILE_WIDTH = 64
 TILE_HEIGHT = 32
+
+class Entity(ctypes.Structure):
+    pass
+Entity._fields_ = [
+    ("id", ctypes.c_int),
+    ("x", ctypes.c_float),
+    ("y", ctypes.c_float),
+    ("vx", ctypes.c_float),
+    ("vy", ctypes.c_float),
+    ("sprite_type", ctypes.c_int),
+    ("health", ctypes.c_float),
+    ("state", ctypes.c_int),
+    ("hitbox_width", ctypes.c_float),
+    ("hitbox_height", ctypes.c_float),
+    ("hitbox_offset_x", ctypes.c_float),
+    ("hitbox_offset_y", ctypes.c_float),
+    ("active", ctypes.c_int),
+    ("prev", ctypes.c_void_p),
+    ("next", ctypes.c_void_p)
+]
 
 def cartesian_to_iso(x, y):
     """Converts world cartesian coordinates to isometric screen coordinates."""

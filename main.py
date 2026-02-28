@@ -7,7 +7,7 @@ from src.inventory_grid import InventoryGrid, Item
 from src.time_system import WorldClock
 from src.animator import Animation, Animator
 from src.player import Player
-from src.utils import cartesian_to_iso, iso_to_cartesian, draw_iso_tile, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_WIDTH, TILE_HEIGHT
+from src.utils import Entity, cartesian_to_iso, iso_to_cartesian, draw_iso_tile, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_WIDTH, TILE_HEIGHT
 from src.level_editor import EditorState
 import math
 import random
@@ -44,26 +44,6 @@ class Point(ctypes.Structure):
 
 class AABB(ctypes.Structure):
     _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float), ("w", ctypes.c_float), ("h", ctypes.c_float)]
-
-class Entity(ctypes.Structure):
-    pass
-Entity._fields_ = [
-    ("id", ctypes.c_int),
-    ("x", ctypes.c_float),
-    ("y", ctypes.c_float),
-    ("vx", ctypes.c_float),
-    ("vy", ctypes.c_float),
-    ("sprite_type", ctypes.c_int),
-    ("health", ctypes.c_float),
-    ("state", ctypes.c_int),
-    ("hitbox_width", ctypes.c_float),
-    ("hitbox_height", ctypes.c_float),
-    ("hitbox_offset_x", ctypes.c_float),
-    ("hitbox_offset_y", ctypes.c_float),
-    ("active", ctypes.c_int),
-    ("prev", ctypes.c_void_p),
-    ("next", ctypes.c_void_p)
-]
 
 class QuadNode(ctypes.Structure):
     pass
@@ -442,10 +422,10 @@ class PlayingState(GameState):
         else:
             self.npc_anim.play("idle")
         
-        self.camera.update(*cartesian_to_iso(self.player.pos[0], self.player.pos[1]))
+        self.camera.update(*cartesian_to_iso(self.player.pos[0], self.player.pos[1]), dt)
         
         if self.engine:
-            self.engine.update_entities(0.05, 0.05)
+            self.engine.update_entities(ctypes.c_float(dt))
             self.engine.update_particles(dt)
             if self.npc_active:
                 # Re-bound Quadtree to active 3x3 chunk area
@@ -582,6 +562,7 @@ class PlayingState(GameState):
                     # Skip drawing the player dot (the Python Player class handles its own rendering)
                     if self.player_entity and ent.id == self.player_entity.contents.id:
                         current = current.contents.next
+                        if current: current = ctypes.cast(current, ctypes.POINTER(Entity))
                         continue
                         
                     # Culling check for C-entities
@@ -606,6 +587,7 @@ class PlayingState(GameState):
                     else:
                         self.culled_count += 1
                 current = current.contents.next
+                if current: current = ctypes.cast(current, ctypes.POINTER(Entity))
                 
         # --- EXECUTE Y-SORT ---
         entities.sort(key=lambda e: e['y'])
