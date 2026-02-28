@@ -120,28 +120,40 @@ class Player:
     def shoot(self, engine, camera):
         """Spawns a bullet toward the mouse cursor."""
         from src.utils import cartesian_to_iso
+        from src.input_manager import InputManager
         import math
         
-        # 1. Get Mouse Screen Pos
-        mx, my = pygame.mouse.get_pos()
+        # 1. Get Mouse Screen Pos via InputManager
+        input_mgr = InputManager()
+        mx, my = input_mgr.get_mouse_pos()
         
-        # 2. Get Player Screen Pos (Center of sprite)
+        # 2. Get Player Screen Pos (Visual center)
         iso_x, iso_y = cartesian_to_iso(self.pos[0], self.pos[1])
-        px, py = camera.apply(iso_x, iso_y)
-        # Adjust for typical sprite center (assuming 64x64 scaled down)
-        py -= 32 
+        screen_x, screen_y = camera.apply(iso_x, iso_y)
         
+        # Use animator's current frame data to find the center
+        _, rect = self.animator.get_current_frame_data()
+        if rect:
+            # Sprite is anchored at (screen_x, screen_y) as its bottom-center
+            # Visual center is height/2 above that base
+            py = screen_y - (rect.height // 2)
+            px = screen_x
+        else:
+            py = screen_y - 32
+            px = screen_x
+            
         # 3. Calculate Angle in Screen Space
         angle = math.atan2(my - py, mx - px)
         
         # 4. Spawn Bullet via C-Bridge
-        # Bullet sprite type is 1
+        # Bullet speed significantly faster than walking (speed=5.0)
+        speed_multiplier = 25.0 
+        
         bullet = engine.add_entity(ctypes.c_float(self.pos[0]), ctypes.c_float(self.pos[1]), 1)
         if bullet:
-            speed = 15.0 # Bullet speed in world units per second
-            bullet.contents.vx = math.cos(angle) * speed
-            bullet.contents.vy = math.sin(angle) * speed
-            print(f"[Shoot] Bullet fired at angle {math.degrees(angle):.1f}°")
+            bullet.contents.vx = math.cos(angle) * speed_multiplier
+            bullet.contents.vy = math.sin(angle) * speed_multiplier
+            print(f"[Shoot] Projectile spawned toward ({mx}, {my}) at {speed_multiplier}u/s")
 
     def draw(self, screen, camera):
         """Renders the player sprite relative to the camera."""

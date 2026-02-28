@@ -281,7 +281,7 @@ class PlayingState(GameState):
             
         elif event.type == pygame.MOUSEBUTTONDOWN:
             action = input_mgr.get_action(event)
-            if action == 'ACTION_SHOOT':
+            if action == 'PLAYER_SHOOT':
                 self.player.shoot(self.engine, self.camera)
             elif event.button == 4: self.weapons.next_weapon()
             elif event.button == 5: self.weapons.previous_weapon()

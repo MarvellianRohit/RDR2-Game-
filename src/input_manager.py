@@ -62,6 +62,10 @@ class InputManager:
         except Exception as e:
             print(f"[Input] Error saving settings: {e}")
 
+    def get_mouse_pos(self):
+        """Returns the current screen coordinates of the mouse cursor."""
+        return pygame.mouse.get_pos()
+
     def get_action(self, event):
         """Translates a Pygame event into a virtual action string (if any)."""
         if event.type == pygame.KEYDOWN:
@@ -70,7 +74,7 @@ class InputManager:
                     return action
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1: # Left Mouse Button
-                return "ACTION_SHOOT"
+                return "PLAYER_SHOOT"
         return None
 
     def is_action_pressed(self, action_name):
