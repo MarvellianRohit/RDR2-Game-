@@ -39,10 +39,10 @@ def draw_iso_tile(screen, x, y, camera=None, color=None, sprite=None):
 def iso_to_cartesian(mx, my, camera):
     """Converts screen mouse coordinates to world cartesian coordinates."""
     # First, undo the camera projection
-    # Camera apply does: (iso_x - self.x + self.w//2, iso_y - self.y + self.h//2)
-    # We need to reverse:
-    iso_x = mx + camera.x - camera.w // 2
-    iso_y = my + camera.y - camera.h // 2
+    # Camera apply does: (iso_world - offset_x)
+    # We need to reverse: iso_world = iso_screen + offset_x
+    iso_x = mx + camera.offset_x
+    iso_y = my + camera.offset_y
     
     # Now undo the isometric projection
     # iso_x - sw/2 = (x - y) * 32
