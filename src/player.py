@@ -110,7 +110,38 @@ class Player:
         else:
             self.animator.play(f"IDLE_{self.direction}")
             
+        if input_mgr.get_action(pygame.event.Event(pygame.MOUSEBUTTONDOWN, {"button": 1})) == "ACTION_SHOOT":
+            # This is a bit hacky because update(dt) doesn't have the event
+            # In a real scenario, events are handled by the state
+            pass
+
         self.animator.update(dt)
+
+    def shoot(self, engine, camera):
+        """Spawns a bullet toward the mouse cursor."""
+        from src.utils import cartesian_to_iso
+        import math
+        
+        # 1. Get Mouse Screen Pos
+        mx, my = pygame.mouse.get_pos()
+        
+        # 2. Get Player Screen Pos (Center of sprite)
+        iso_x, iso_y = cartesian_to_iso(self.pos[0], self.pos[1])
+        px, py = camera.apply(iso_x, iso_y)
+        # Adjust for typical sprite center (assuming 64x64 scaled down)
+        py -= 32 
+        
+        # 3. Calculate Angle in Screen Space
+        angle = math.atan2(my - py, mx - px)
+        
+        # 4. Spawn Bullet via C-Bridge
+        # Bullet sprite type is 1
+        bullet = engine.add_entity(ctypes.c_float(self.pos[0]), ctypes.c_float(self.pos[1]), 1)
+        if bullet:
+            speed = 15.0 # Bullet speed in world units per second
+            bullet.contents.vx = math.cos(angle) * speed
+            bullet.contents.vy = math.sin(angle) * speed
+            print(f"[Shoot] Bullet fired at angle {math.degrees(angle):.1f}°")
 
     def draw(self, screen, camera):
         """Renders the player sprite relative to the camera."""

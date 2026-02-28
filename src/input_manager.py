@@ -68,6 +68,9 @@ class InputManager:
             for action, key in self.bindings.items():
                 if event.key == key:
                     return action
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1: # Left Mouse Button
+                return "ACTION_SHOOT"
         return None
 
     def is_action_pressed(self, action_name):

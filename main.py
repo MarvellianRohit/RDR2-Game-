@@ -51,6 +51,8 @@ Entity._fields_ = [
     ("id", ctypes.c_int),
     ("x", ctypes.c_float),
     ("y", ctypes.c_float),
+    ("vx", ctypes.c_float),
+    ("vy", ctypes.c_float),
     ("sprite_type", ctypes.c_int),
     ("hitbox_width", ctypes.c_float),
     ("hitbox_height", ctypes.c_float),
@@ -86,7 +88,7 @@ def load_engine():
         engine.engine_shutdown.argtypes = []
         engine.add_entity.argtypes = [ctypes.c_float, ctypes.c_float, ctypes.c_int]
         engine.add_entity.restype = ctypes.POINTER(Entity)
-        engine.update_entities.argtypes = [ctypes.c_float, ctypes.c_float]
+        engine.update_entities.argtypes = [ctypes.c_float]
         engine.get_entity_head.restype = ctypes.POINTER(Entity)
         engine.find_path.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(Point), ctypes.c_int]
         engine.find_path.restype = ctypes.c_int
@@ -278,7 +280,10 @@ class PlayingState(GameState):
             elif action == 'ACTION_INVENTORY': self.show_inventory = not self.show_inventory
             
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 4: self.weapons.next_weapon()
+            action = input_mgr.get_action(event)
+            if action == 'ACTION_SHOOT':
+                self.player.shoot(self.engine, self.camera)
+            elif event.button == 4: self.weapons.next_weapon()
             elif event.button == 5: self.weapons.previous_weapon()
             else:
                 mx, my = pygame.mouse.get_pos()
@@ -331,7 +336,9 @@ class PlayingState(GameState):
     def update(self, dt):
         self.logic.update(dt)
         self.clock.update(dt)
-        self.player.update(dt, self.world)
+        if self.engine:
+            self.engine.update_entities(ctypes.c_float(dt))
+        self.player.update(dt, self.world, self.engine)
         if self.engine and self.player_entity:
             self.player_entity.contents.x = self.player.pos[0]
             self.player_entity.contents.y = self.player.pos[1]

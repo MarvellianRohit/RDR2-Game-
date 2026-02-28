@@ -11,6 +11,8 @@ typedef struct Entity {
   int id;
   float x;
   float y;
+  float vx;
+  float vy;
   int sprite_type; // 0=None, 1=Bullet, 2=Enemy, etc.
   float hitbox_width;
   float hitbox_height;
@@ -33,6 +35,8 @@ Entity *add_entity(float x, float y, int sprite_type) {
   new_entity->id = next_id++;
   new_entity->x = x;
   new_entity->y = y;
+  new_entity->vx = 0.0f;
+  new_entity->vy = 0.0f;
   new_entity->sprite_type = sprite_type;
   new_entity->hitbox_width = 32.0f;  // Default
   new_entity->hitbox_height = 32.0f; // Default
@@ -51,13 +55,13 @@ Entity *add_entity(float x, float y, int sprite_type) {
   return new_entity;
 }
 
-// Batch update positions (example: moving all bullets forward)
-void update_entities(float dx, float dy) {
+// Batch update positions (using per-entity velocity)
+void update_entities(float dt) {
   Entity *current = head;
   while (current) {
     if (current->active) {
-      current->x += dx;
-      current->y += dy;
+      current->x += current->vx * dt;
+      current->y += current->vy * dt;
     }
     current = current->next;
   }
