@@ -31,6 +31,32 @@ class HUDManager:
         if show_inventory and inventory:
             self.draw_inventory(screen, inventory)
 
+    def draw_game_over_overlay(self, screen):
+        """Renders the full-screen Game Over screen."""
+        screen_w, screen_h = screen.get_size()
+        
+        # Dark Red Overlay
+        overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
+        overlay.fill((80, 0, 0, 180))
+        screen.blit(overlay, (0, 0))
+        
+        # "YOU DIED" Text
+        # Use a larger font internal to this method for emphasis
+        font_death = pygame.font.SysFont("serif", int(120 * (self.font_main.get_height()/36.0)), bold=True)
+        death_surf = font_death.render("YOU DIED", True, (255, 50, 50))
+        death_rect = death_surf.get_rect(center=(screen_w // 2, screen_h // 2 - 50))
+        
+        # Shadow
+        shadow_surf = font_death.render("YOU DIED", True, (20, 0, 0))
+        screen.blit(shadow_surf, (death_rect.x + 5, death_rect.y + 5))
+        screen.blit(death_surf, death_rect)
+        
+        # Prompt Text
+        prompt_str = "Press [R] to Restart or [L] to Load Last Save"
+        prompt_surf = self.font_main.render(prompt_str, True, (200, 200, 200))
+        prompt_rect = prompt_surf.get_rect(center=(screen_w // 2, screen_h // 2 + 80))
+        screen.blit(prompt_surf, prompt_rect)
+
     def draw_clock(self, screen, time_str):
         """Displays the formatted in-game time."""
         screen_w, _ = screen.get_size()

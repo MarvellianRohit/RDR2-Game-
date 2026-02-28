@@ -153,7 +153,6 @@ class PlayingState(GameState):
         self.player_light = LightSource(0, 0, 1600, (255, 220, 150))
         self.grid = (ctypes.c_int * (GRID_SIZE * GRID_SIZE))(*([0] * (GRID_SIZE * GRID_SIZE)))
         
-        self.health = 100
         self.player = Player([2.0, 2.0], speed=6.0)
         
         # --- C-Engine Player Entity Setup ---
@@ -281,14 +280,15 @@ class PlayingState(GameState):
 
     def perform_save(self):
         loc = LocalizationManager()
-        state = {"pos": self.player.pos, "health": self.health, "weapon": self.weapons.current_weapon.name}
+        state = {"pos": self.player.pos, "health": self.player.health, "weapon": self.weapons.current_weapon.name}
         if self.save_manager.save_game(state): print(loc.get("UI_SAVE_SUCCESS"))
 
     def perform_load(self):
         loc = LocalizationManager()
         data = self.save_manager.load_game()
         if data:
-            self.player.pos, self.health = data["pos"], data["health"]
+            self.player.pos, self.player.health = data["pos"], data["health"]
+            self.player.is_dead = False
             while self.weapons.current_weapon.name != data["weapon"]: self.weapons.next_weapon()
             print(loc.get("UI_LOAD_SUCCESS"))
 
@@ -309,6 +309,30 @@ class PlayingState(GameState):
         
         self.manager.push(DialogueState(self.manager, DialogueManager(root, persona=loc.get("UI_SHERIFF_NAME"), reputation=100), UI_FONT_SCALE))
 
+    def reset(self):
+        """Resets the state to a clean starting point for a restart."""
+        if self.engine:
+            self.engine.clear_entities()
+            # Re-spawn player and test enemy
+            self.player_entity = self.engine.add_entity(2.0, 2.0, 0)
+            if self.player_entity:
+                self.player_entity.contents.hitbox_width = 32.0
+                self.player_entity.contents.hitbox_height = 16.0
+                self.player_entity.contents.hitbox_offset_x = 0.0
+                self.player_entity.contents.hitbox_offset_y = -8.0
+            
+            self.enemy_entity = self.engine.add_entity(10.0, 10.0, 2)
+            if self.enemy_entity:
+                self.enemy_entity.contents.health = 100.0
+                self.enemy_entity.contents.hitbox_width = 32.0
+                self.enemy_entity.contents.hitbox_height = 32.0
+
+        # Reset player props
+        self.player.pos = [2.0, 2.0]
+        self.player.health = 100.0
+        self.player.is_dead = False
+        print("[Game] State reset completed.")
+
     def calculate_npc_path(self, tx, ty):
         if not self.engine: return
         max_len = GRID_SIZE * GRID_SIZE
@@ -327,7 +351,7 @@ class PlayingState(GameState):
         self.clock.update(dt)
         if self.engine:
             self.engine.update_entities(ctypes.c_float(dt))
-        self.player.update(dt, self.world, self.engine)
+        self.player.update(dt, self.world, self.engine, self.events)
         if self.engine and self.player_entity:
             self.player_entity.contents.x = self.player.pos[0]
             self.player_entity.contents.y = self.player.pos[1]
@@ -344,7 +368,7 @@ class PlayingState(GameState):
         
         if self.director_timer >= 60:
             sheriff_pos = [2.0, 2.0]
-            self.director.assess_state(sheriff_pos, self.health, self.npc_active)
+            self.director.assess_state(sheriff_pos, self.player.health, self.npc_active)
             self.director_timer = 0
             
         # --- Bullet Hit Detection & Target Destruction ---
@@ -412,7 +436,9 @@ class PlayingState(GameState):
             
         while self.events._queue:
             ev = self.events._queue.popleft()
-            # Removed redundant ACTION_SHOOT handler here as it's handled in handle_event
+            if ev.type == 'PLAYER_DEATH':
+                print("[Game] Player death event received!")
+                self.manager.push(GameOverState(self.manager, self))
         
         if self.npc_active and self.npc_path:
             self.move_timer += dt
@@ -626,7 +652,7 @@ class PlayingState(GameState):
         # --- HUD Render (Last Layer) ---
         sheriff_pos = [2.0, 2.0]
         static_npcs = [(sheriff_pos[0], sheriff_pos[1], COLOR_SHERIFF)]
-        self.hud.render(screen, self.health, self.weapons.current_weapon, 
+        self.hud.render(screen, self.player.health, self.weapons.current_weapon, 
                         self.player.pos, self.engine.get_entity_head(), static_npcs,
                         inventory=self.inventory, show_inventory=self.show_inventory,
                         time_str=self.clock.get_formatted_time())
@@ -716,6 +742,29 @@ class PausedState(GameState):
         txt = self.font.render(loc.get("UI_PAUSED"), True, (255, 255, 255))
         screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)))
 
+class GameOverState(GameState):
+    """Semi-paused state triggered on player death."""
+    def __init__(self, manager, playing_state):
+        super().__init__(manager)
+        self.playing_state = playing_state
+    
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_r:
+                self.playing_state.reset()
+                self.manager.pop()
+            elif event.key == pygame.K_l:
+                self.playing_state.perform_load()
+                self.manager.pop()
+                
+    def update(self, dt):
+        # Game logic is paused here
+        pass
+        
+    def draw(self, screen):
+        # Draw the world underneath (already handled by main loop draw logic)
+        self.playing_state.hud.draw_game_over_overlay(screen)
+
 def main():
     pygame.init()
     # Initialize Input Manager
@@ -781,8 +830,8 @@ def main():
             
             # Render game to the off-screen surface
             main_surface.fill(COLOR_BG)
-            if isinstance(state_manager.peek(), (PausedState, DialogueState, ConsoleState)) and len(state_manager._stack) > 1:
-                # Under-draw for overlays (now includes ConsoleState)
+            if isinstance(state_manager.peek(), (PausedState, DialogueState, ConsoleState, GameOverState)) and len(state_manager._stack) > 1:
+                # Under-draw for overlays (includes GameOverState)
                 state_manager._stack[-2].draw(main_surface)
             state_manager.draw(main_surface)
             

@@ -7,6 +7,8 @@ class Player:
     def __init__(self, start_pos, speed=5.0):
         self.pos = list(start_pos) # [x, y] in world coordinates
         self.speed = speed
+        self.health = 100.0
+        self.is_dead = False
         self.direction = "S"
         self.animator = Animator()
         self._init_animations()
@@ -48,7 +50,7 @@ class Player:
         
         self.animator.play("IDLE_S")
 
-    def update(self, dt, world_manager=None, engine=None):
+    def update(self, dt, world_manager=None, engine=None, event_manager=None):
         """Processes input and updates movement/animations with collision detection."""
         input_mgr = InputManager()
         move_vec = [0.0, 0.0]
@@ -114,6 +116,12 @@ class Player:
             # This is a bit hacky because update(dt) doesn't have the event
             # In a real scenario, events are handled by the state
             pass
+
+        if self.health <= 0 and not self.is_dead:
+            self.is_dead = True
+            if event_manager:
+                event_manager.post('PLAYER_DEATH')
+            print("[Player] Character has died.")
 
         self.animator.update(dt)
 
