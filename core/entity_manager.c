@@ -14,6 +14,8 @@ typedef struct Entity {
   float vx;
   float vy;
   int sprite_type; // 0=None, 1=Bullet, 2=Enemy, etc.
+  float health;
+  int state; // 0=ALIVE, 1=DEAD
   float hitbox_width;
   float hitbox_height;
   float hitbox_offset_x;
@@ -38,6 +40,8 @@ Entity *add_entity(float x, float y, int sprite_type) {
   new_entity->vx = 0.0f;
   new_entity->vy = 0.0f;
   new_entity->sprite_type = sprite_type;
+  new_entity->health = 100.0f;
+  new_entity->state = 0;
   new_entity->hitbox_width = 32.0f;  // Default
   new_entity->hitbox_height = 32.0f; // Default
   new_entity->hitbox_offset_x = 0.0f;

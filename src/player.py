@@ -48,7 +48,7 @@ class Player:
         
         self.animator.play("IDLE_S")
 
-    def update(self, dt, world_manager=None):
+    def update(self, dt, world_manager=None, engine=None):
         """Processes input and updates movement/animations with collision detection."""
         input_mgr = InputManager()
         move_vec = [0.0, 0.0]

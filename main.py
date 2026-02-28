@@ -54,6 +54,8 @@ Entity._fields_ = [
     ("vx", ctypes.c_float),
     ("vy", ctypes.c_float),
     ("sprite_type", ctypes.c_int),
+    ("health", ctypes.c_float),
+    ("state", ctypes.c_int),
     ("hitbox_width", ctypes.c_float),
     ("hitbox_height", ctypes.c_float),
     ("hitbox_offset_x", ctypes.c_float),
@@ -186,6 +188,13 @@ class PlayingState(GameState):
                 self.player_entity.contents.hitbox_height = 16.0
                 self.player_entity.contents.hitbox_offset_x = 0.0
                 self.player_entity.contents.hitbox_offset_y = -8.0 # Precisely at feet
+                
+            # --- Test Enemy Setup ---
+            self.enemy_entity = self.engine.add_entity(10.0, 10.0, 2) # Type 2: Enemy
+            if self.enemy_entity:
+                self.enemy_entity.contents.health = 100.0
+                self.enemy_entity.contents.hitbox_width = 32.0
+                self.enemy_entity.contents.hitbox_height = 32.0
         
         # NPC Setup (Disabled to resolve duplicate sprite issue)
         self.npc_pos, self.npc_active, self.npc_path, self.move_timer = [5.0, 5.0], False, [], 0
@@ -358,16 +367,72 @@ class PlayingState(GameState):
             self.director.assess_state(sheriff_pos, self.health, self.npc_active)
             self.director_timer = 0
             
+        # --- Bullet Hit Detection & Target Destruction ---
+        if self.engine:
+            # 1. Rebuild Quadtree for spatial querying
+            root_aabb = AABB(0.0, 0.0, float(GRID_SIZE), float(GRID_SIZE))
+            qt = self.engine.create_node(root_aabb)
+            
+            # Populate QT
+            curr = self.engine.get_entity_head()
+            while curr:
+                if curr.contents.active:
+                    self.engine.qt_insert(qt, curr.contents.id, curr.contents.x, curr.contents.y)
+                curr = curr.contents.next
+                if curr: curr = ctypes.cast(curr, ctypes.POINTER(Entity))
+            
+            # 2. Iterate bullets and check hits
+            curr = self.engine.get_entity_head()
+            while curr:
+                ent = curr.contents
+                if ent.active and ent.sprite_type == 1: # Bullet
+                    # Query for nearby entities
+                    search_range = AABB(ent.x - 1.0, ent.y - 1.0, 2.0, 2.0)
+                    found_ids = (ctypes.c_int * 10)()
+                    found_count = ctypes.c_int(0)
+                    self.engine.qt_query(qt, search_range, found_ids, ctypes.byref(found_count), 10)
+                    
+                    for i in range(found_count.value):
+                        target_id = found_ids[i]
+                        if target_id == ent.id: continue
+                        
+                        # Find the target entity object
+                        target_ent = self.engine.get_entity_head()
+                        while target_ent:
+                            t = target_ent.contents
+                            if t.id == target_id and t.active:
+                                # Check collision (Type 2 = Enemy, etc.)
+                                if t.sprite_type == 2:
+                                    bullet_aabb = AABB(ent.x - 0.1, ent.y - 0.1, 0.2, 0.2)
+                                    target_aabb = AABB(t.x - 0.4, t.y - 0.4, 0.8, 0.8)
+                                    
+                                    if self.engine.check_collision_aabb(bullet_aabb, target_aabb):
+                                        # IMPACT!
+                                        ent.active = 0
+                                        t.health -= 25.0
+                                        
+                                        # Emit Particles
+                                        for _ in range(15):
+                                            evx = (random.random() - 0.5) * 4.0
+                                            evy = (random.random() - 0.5) * 4.0
+                                            self.engine.emit(ent.x, ent.y, evx, evy, 0.5 + random.random(), 0xFF5555FF)
+                                            
+                                        if t.health <= 0:
+                                            t.state = 1 # DEAD
+                                            t.active = 0 
+                                            print(f"[Game] Target {t.id} destroyed.")
+                                        break
+                            target_ent = target_ent.contents.next
+                            if target_ent: target_ent = ctypes.cast(target_ent, ctypes.POINTER(Entity))
+                
+                curr = curr.contents.next
+                if curr: curr = ctypes.cast(curr, ctypes.POINTER(Entity))
+            
+            self.engine.free_quadtree(qt)
+            
         while self.events._queue:
             ev = self.events._queue.popleft()
-            if ev.type == 'ACTION_SHOOT' and self.engine:
-                # Spawn bullet with sprite_type 1
-                self.engine.add_entity(0.0, 0.0, 1)
-                shot_sound = AssetManager().get_sound("gunshot")
-                if shot_sound: self.audio.play_sound(shot_sound, priority=0, category="sfx")
-                
-                # Trigger Mod Hooks
-                self.mod_loader.trigger_shoot(self.npc_pos[0], self.npc_pos[1])
+            # Removed redundant ACTION_SHOOT handler here as it's handled in handle_event
         
         if self.npc_active and self.npc_path:
             self.move_timer += dt
