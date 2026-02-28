@@ -12,28 +12,39 @@ class Player:
         self._init_animations()
 
     def _init_animations(self):
-        # Try to load real sprite sheet from AssetManager
+        # Try to load real sprite sheets from AssetManager
         from src.asset_manager import AssetManager
         am = AssetManager()
-        surface = am.get_sprite("outlaw_idle")
         
-        if not surface:
-            # Fallback to placeholder if asset not loaded
-            surface = pygame.Surface((128, 32), pygame.SRCALPHA)
-            for i in range(4):
-                pygame.draw.rect(surface, (50, 150, 50), (i*32, 0, 32, 32))
-                pygame.draw.rect(surface, (255, 255, 255), (i*32, 0, 32, 32), 1)
-            surface = surface.convert_alpha()
+        idle_surf = am.get_sprite("outlaw_idle")
+        walk_surf = am.get_sprite("outlaw_walk")
+        
+        # Setup IDLE animations (1 frame)
+        if idle_surf:
+            w, h = idle_surf.get_width(), idle_surf.get_height()
+            for d in ["N", "S", "E", "W"]:
+                self.animator.add_animation(f"IDLE_{d}", Animation(idle_surf, w, h, 1, frame_duration=1.0))
+        else:
+            # Fallback
+            surf = pygame.Surface((32, 32), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (50, 150, 50), (16, 16), 14)
+            for d in ["N", "S", "E", "W"]:
+                self.animator.add_animation(f"IDLE_{d}", Animation(surf, 32, 32, 1))
 
-        # Use actual dimensions for the animation frame
-        w, h = surface.get_width(), surface.get_height()
-        
-        # In this placeholder logic, we use the same sheet for all states
-        # but vary the frame count to simulate different types of anims
-        # If the sheet is narrow, assume it's a single frame (like outlaw_idle)
-        for d in ["N", "S", "E", "W"]:
-            self.animator.add_animation(f"IDLE_{d}", Animation(surface, w, h, 1, frame_duration=1.0))
-            self.animator.add_animation(f"WALK_{d}", Animation(surface, w, h, 1, frame_duration=0.15))
+        # Setup WALK animations (4 frames)
+        if walk_surf:
+            # Assuming horizontal strip: 4 frames
+            # Adjust frame dimensions based on sheet width
+            frame_w = walk_surf.get_width() // 4
+            frame_h = walk_surf.get_height()
+            for d in ["N", "S", "E", "W"]:
+                self.animator.add_animation(f"WALK_{d}", Animation(walk_surf, frame_w, frame_h, 4, frame_duration=0.15))
+        else:
+            # Fallback using idle or placeholder
+            surf = idle_surf if idle_surf else pygame.Surface((32, 32), pygame.SRCALPHA)
+            w, h = surf.get_width(), surf.get_height()
+            for d in ["N", "S", "E", "W"]:
+                self.animator.add_animation(f"WALK_{d}", Animation(surf, w, h, 1))
         
         self.animator.play("IDLE_S")
 

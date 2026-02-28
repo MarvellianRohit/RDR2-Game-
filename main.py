@@ -683,6 +683,7 @@ def main():
     AssetManager().load_directory("assets", default_scales={
         "desert_ground": (TILE_WIDTH, TILE_HEIGHT),
         "outlaw_idle": 0.2,   # Scale down large character assets
+        "outlaw_walk": 0.2,
         "bandit": 0.2,
         "cactus": (48, 64),
         "bullet": (8, 8)
